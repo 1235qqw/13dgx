@@ -1,175 +1,166 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>4 в ряд</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    text-align: center;
-    background: #f0f0f0;
-  }
-  h1 {
-    margin-top: 20px;
-  }
-  #board {
-    margin: 20px auto;
-    display: grid;
-    grid-template-columns: repeat(7, 60px);
-    grid-template-rows: repeat(6, 60px);
-    gap: 5px;
-    width: max-content;
-    background: #0077cc;
-    padding: 10px;
-    border-radius: 10px;
-  }
-  .cell {
-    width: 60px;
-    height: 60px;
-    background: #e1e1e1;
-    border-radius: 50%;
-    box-shadow: inset 0 0 5px #aaa;
-    cursor: pointer;
-  }
-  .cell.red {
-    background: red;
-    box-shadow: inset 0 0 10px #800000;
-  }
-  .cell.yellow {
-    background: yellow;
-    box-shadow: inset 0 0 10px #aaaa00;
-  }
-  #message {
-    font-size: 18px;
-    margin-top: 15px;
-  }
-  #resetBtn {
-    margin-top: 20px;
-    padding: 8px 20px;
-    font-size: 16px;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <title>4 в ряд с ИИ Minimax</title>
+  <style>
+    body { font-family: Arial; display: flex; flex-direction: column; align-items: center; margin: 20px; }
+    #board { display: grid; grid-template-columns: repeat(7, 60px); gap: 5px; margin: 20px; }
+    .cell { width:60px; height:60px; background:#00aaff;border-radius:10px;cursor:pointer;display:flex;justify-content:center;align-items:center; }
+    .piece { width:50px; height:50px; border-radius:50%; }
+    .red { background:red; } .yellow { background:yellow; }
+    #status { font-size:18px; }
+    button { padding:8px 16px; margin-top:10px; }
+  </style>
 </head>
 <body>
-<h1>Игра 4 в ряд</h1>
-<div id="board"></div>
-<div id="message">Ходит игрок: <span id="currentPlayer">Красный</span></div>
-<button id="resetBtn">Начать заново</button>
+  <h1>4 в ряд (ИИ Minimax)</h1>
+  <div id="board"></div>
+  <div id="status">Ты ходишь (красный)</div>
+  <button onclick="resetGame()">Сбросить</button>
 
-<script>
-  const rows = 6;
-  const cols = 7;
-  const board = [];
-  let currentPlayer = 'red'; // red или yellow
-  let gameOver = false;
+  <script>
+    const ROWS = 6, COLS = 7, DEPTH = 4;
+    let board = [], gameOver = false, playerTurn = true;
+    const boardDiv = document.getElementById('board'), status = document.getElementById('status');
 
-  const boardDiv = document.getElementById('board');
-  const message = document.getElementById('message');
-  const currentPlayerSpan = document.getElementById('currentPlayer');
-  const resetBtn = document.getElementById('resetBtn');
-
-  // Инициализация пустой доски
-  function initBoard() {
-    boardDiv.innerHTML = '';
-    for(let r = 0; r < rows; r++) {
-      board[r] = [];
-      for(let c = 0; c < cols; c++) {
-        board[r][c] = null;
-        const cell = document.createElement('div');
-        cell.classList.add('cell');
-        cell.dataset.row = r;
-        cell.dataset.col = c;
-        boardDiv.appendChild(cell);
-      }
-    }
-  }
-
-  // Найти нижнюю свободную ячейку в колонке
-  function findRow(col) {
-    for(let r = rows - 1; r >= 0; r--) {
-      if(!board[r][col]) return r;
-    }
-    return -1;
-  }
-
-  // Проверка победы
-  function checkWin(r, c) {
-    function countDir(dr, dc) {
-      let count = 0;
-      let rr = r + dr;
-      let cc = c + dc;
-      while(rr >= 0 && rr < rows && cc >= 0 && cc < cols && board[rr][cc] === currentPlayer) {
-        count++;
-        rr += dr;
-        cc += dc;
-      }
-      return count;
-    }
-    // Проверяем в 4 направлениях (горизонталь, вертикаль, две диагонали)
-    if(countDir(0, 1) + countDir(0, -1) + 1 >= 4) return true;
-    if(countDir(1, 0) + countDir(-1, 0) + 1 >= 4) return true;
-    if(countDir(1, 1) + countDir(-1, -1) + 1 >= 4) return true;
-    if(countDir(1, -1) + countDir(-1, 1) + 1 >= 4) return true;
-    return false;
-  }
-
-  // Проверка ничьей
-  function checkDraw() {
-    for(let c = 0; c < cols; c++) {
-      if(board[0][c] === null) return false;
-    }
-    return true;
-  }
-
-  // Обработка клика по ячейке (ставим фишку в колонку)
-  boardDiv.addEventListener('click', (e) => {
-    if(gameOver) return;
-    if(!e.target.classList.contains('cell')) return;
-
-    const col = Number(e.target.dataset.col);
-    const row = findRow(col);
-    if(row === -1) return; // колонка заполнена
-
-    board[row][col] = currentPlayer;
-
-    // Отрисовка фишки
-    const cellDivs = boardDiv.children;
-    for(let i = 0; i < cellDivs.length; i++) {
-      const cell = cellDivs[i];
-      if(Number(cell.dataset.row) === row && Number(cell.dataset.col) === col) {
-        cell.classList.add(currentPlayer);
-        break;
+    function createBoard(){
+      boardDiv.innerHTML = '';
+      board = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          const cell = document.createElement('div');
+          cell.classList.add('cell');
+          cell.dataset.row = r; cell.dataset.col = c;
+          cell.onclick = () => { if(playerTurn && !gameOver) makeMove(c, 'red'); };
+          boardDiv.appendChild(cell);
+        }
       }
     }
 
-    if(checkWin(row, col)) {
-      message.textContent = `Победил игрок: ${currentPlayer === 'red' ? 'Красный' : 'Жёлтый'}!`;
+    function makeMove(col, color){
+      const row = getNextRow(col);
+      if(row < 0) return;
+      board[row][col] = color;
+      updateBoard();
+      if(checkWin(row,col,color)){ endGame(color==='red' ? 'Ты победил!' : 'ИИ победил!'); return; }
+      if(isFull()){ endGame('Ничья'); return; }
+      playerTurn = (color === 'yellow');
+      status.textContent = playerTurn ? 'Ты ходишь (красный)' : 'ИИ думает...';
+      if(!playerTurn) setTimeout(botThink, 200);
+    }
+
+    function getNextRow(col){
+      for(let r=ROWS-1;r>=0;r--) if(!board[r][col]) return r;
+      return -1;
+    }
+
+    function updateBoard(){
+      document.querySelectorAll('.cell').forEach(cell => {
+        const r = +cell.dataset.row, c = +cell.dataset.col;
+        cell.innerHTML = '';
+        if(board[r][c]){
+          const p = document.createElement('div');
+          p.classList.add('piece', board[r][c]);
+          cell.appendChild(p);
+        }
+      });
+    }
+
+    function botThink(){
+      const {col} = minimax(board, DEPTH, -Infinity, Infinity, true);
+      makeMove(col, 'yellow');
+    }
+
+    function minimax(bd, depth, alpha, beta, maximizing){
+      if(depth===0 || isTerminal(bd)){
+        return {score: evaluate(bd)};
+      }
+      if(maximizing){
+        let max = {score:-Infinity, col: null};
+        for(let c=0;c<COLS;c++){
+          const r = getNextRowCol(bd, c);
+          if(r<0) continue;
+          const tmp = copyBoard(bd); tmp[r][c]='yellow';
+          const result = minimax(tmp, depth-1, alpha, beta, false);
+          if(result.score > max.score) max = {score: result.score, col: c};
+          alpha = Math.max(alpha, max.score);
+          if(beta <= alpha) break;
+        }
+        return max;
+      } else {
+        let min = {score:Infinity, col: null};
+        for(let c=0;c<COLS;c++){
+          const r = getNextRowCol(bd, c);
+          if(r<0) continue;
+          const tmp = copyBoard(bd); tmp[r][c]='red';
+          const result = minimax(tmp, depth-1, alpha, beta, true);
+          if(result.score < min.score) min = {score: result.score, col: c};
+          beta = Math.min(beta, min.score);
+          if(beta <= alpha) break;
+        }
+        return min;
+      }
+    }
+
+    function getNextRowCol(bd, col){
+      for(let r=ROWS-1;r>=0;r--) if(!bd[r][col]) return r;
+      return -1;
+    }
+
+    function copyBoard(bd){
+      return bd.map(row => row.slice());
+    }
+
+    function isTerminal(bd){
+      return checkWinBoard(bd,'red')||checkWinBoard(bd,'yellow')|| bd.every(r=>r.every(c=>c));
+    }
+
+    function checkWinBoard(bd, color){
+      for(let r=0;r<ROWS;r++){
+        for(let c=0;c<COLS;c++){
+          if(bd[r][c]===color && checkWin(r,c,color,bd)) return true;
+        }
+      }
+      return false;
+    }
+
+    function checkWin(row,col,color,bd=board){
+      const dirs = [[[0,1],[0,-1]],[[1,0],[-1,0]],[[1,1],[-1,-1]],[[1,-1],[-1,1]]];
+      for(const dir of dirs){
+        let cnt = 1;
+        for(const [dx,dy] of dir){
+          let r=row+dx, c=col+dy;
+          while(r>=0 && r<ROWS && c>=0 && c<COLS && bd[r][c]===color){
+            cnt++; r+=dx; c+=dy;
+          }
+        }
+        if(cnt>=4) return true;
+      }
+      return false;
+    }
+
+    function evaluate(bd){
+      const score = (checkWinBoard(bd,'yellow')? 1000:0) - (checkWinBoard(bd,'red')? 1000:0);
+      return score;
+    }
+
+    function isFull(){
+      return board[0].every(c=>c);
+    }
+
+    function endGame(msg){
+      status.textContent = msg;
       gameOver = true;
-      return;
     }
 
-    if(checkDraw()) {
-      message.textContent = 'Ничья! Все ячейки заполнены.';
-      gameOver = true;
-      return;
+    function resetGame(){
+      gameOver = false; playerTurn = true;
+      status.textContent = 'Ты ходишь (красный)';
+      createBoard();
     }
 
-    // Смена игрока
-    currentPlayer = currentPlayer === 'red' ? 'yellow' : 'red';
-    currentPlayerSpan.textContent = currentPlayer === 'red' ? 'Красный' : 'Жёлтый';
-  });
-
-  resetBtn.addEventListener('click', () => {
-    initBoard();
-    currentPlayer = 'red';
-    gameOver = false;
-    currentPlayerSpan.textContent = 'Красный';
-    message.textContent = 'Ходит игрок: ';
-  });
-
-  // Старт игры
-  initBoard();
-</script>
+    createBoard();
+  </script>
 </body>
 </html>
